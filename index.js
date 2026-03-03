@@ -3,12 +3,11 @@ const pino = require("pino");
 const express = require("express");
 const app = express();
 
-// --- ඔයාගේ නම්බර් එක මෙතනට ඇතුළත් කළා ---
 const myNumber = "94765821687"; 
 
-// Render Web Server Setup
+// Render Web Server
 const PORT = process.env.PORT || 10000;
-app.get("/", (req, res) => res.send("Hogwarts Council Pairing System Active! 🪄"));
+app.get("/", (req, res) => res.send("Hogwarts Council Advanced System! 🏰"));
 app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
 
 async function startBot() {
@@ -23,38 +22,77 @@ async function startBot() {
         },
         printQRInTerminal: false,
         logger: pino({ level: "silent" }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        browser: ["Hogwarts Bot", "Safari", "3.0"]
     });
-
-    // --- AUTOMATIC PAIRING CODE GENERATOR ---
-    if (!conn.authState.creds.registered) {
-        await new Promise(resolve => setTimeout(resolve, 8000)); // Build එක ස්ථාවර වෙනකම් තත්පර 8ක් ඉන්නවා
-        try {
-            const code = await conn.requestPairingCode(myNumber.trim());
-            console.log("\n=========================================");
-            console.log(`👉 YOUR WHATSAPP PAIRING CODE: ${code}`);
-            console.log("=========================================\n");
-        } catch (error) {
-            console.log("Error requesting pairing code: ", error);
-        }
-    }
 
     conn.ev.on('creds.update', saveCreds);
     conn.ev.on('connection.update', (u) => {
-        const { connection } = u;
-        if (connection === 'open') console.log("✅ HOGWARTS COUNCIL ONLINE!");
-        if (connection === 'close') startBot();
+        if (u.connection === 'open') console.log("✅ HOGWARTS COUNCIL ONLINE!");
+        if (u.connection === 'close') startBot();
     });
 
-    // පොඩි මෙනු එකක් (පරීක්ෂා කිරීමට)
     conn.ev.on('messages.upsert', async (m) => {
         const mek = m.messages[0];
         if (!mek.message || mek.key.fromMe) return;
-        const from = mek.key.remoteJid;
-        const body = mek.message.conversation || mek.message.extendedTextMessage?.text || "";
 
-        if (body.toLowerCase() === '.menu') {
-            await conn.sendMessage(from, { text: "✨ *HOGWARTS COUNCIL* ✨\n\nStatus: Online 🪄\nOwner: Rashmika" });
+        const from = mek.key.remoteJid;
+        const type = Object.keys(mek.message)[0];
+        const body = mek.message.conversation || mek.message.extendedTextMessage?.text || "";
+        const prefix = ".";
+        const isGroup = from.endsWith('@g.us');
+
+        if (body.startsWith(prefix)) {
+            const command = body.slice(prefix.length).trim().split(/ +/).shift().toLowerCase();
+            const args = body.trim().split(/ +/).slice(1);
+
+            // --- 📢 MENTION ALL (TAG ALL) ---
+            if (command === 'tagall' || command === 'hidetag') {
+                if (!isGroup) return;
+                const groupMetadata = await conn.groupMetadata(from);
+                const participants = groupMetadata.participants;
+                let text = args.length > 0 ? `📢 *Message:* ${args.join(' ')}\n\n` : `📢 *Attention Everyone!*\n\n`;
+                for (let mem of participants) {
+                    text += `⚡ @${mem.id.split('@')[0]}\n`;
+                }
+                await conn.sendMessage(from, { text: text, mentions: participants.map(a => a.id) });
+            }
+
+            // --- 🚫 KICK (Reply to a message) ---
+            if (command === 'kick') {
+                if (!isGroup) return;
+                const quoted = mek.message.extendedTextMessage?.contextInfo?.participant;
+                if (!quoted) return await conn.sendMessage(from, { text: "Please reply to the user you want to kick! 🪄" });
+                await conn.groupParticipantsUpdate(from, [quoted], "remove");
+                await conn.sendMessage(from, { text: "User has been banished from Hogwarts! 🪄🚫" });
+            }
+
+            // --- ❄️ FREEZE (Group Settings) ---
+            if (command === 'freeze' || command === 'mute') {
+                if (!isGroup) return;
+                await conn.groupSettingUpdate(from, 'announcement');
+                await conn.sendMessage(from, { text: "Group is now *FROZEN*. Only Admins can talk! ❄️🛡️" });
+            }
+
+            // --- 🔥 UNFREEZE (Group Settings) ---
+            if (command === 'unfreeze' || command === 'unmute') {
+                if (!isGroup) return;
+                await conn.groupSettingUpdate(from, 'not_announcement');
+                await conn.sendMessage(from, { text: "Group is now *UNFROZEN*. Everyone can talk! 🔥🔓" });
+            }
+
+            // --- 🏰 MENU ---
+            if (command === 'menu') {
+                let menuText = `🏰 *HOGWARTS ADMIN PANEL* 🏰\n\n` +
+                               `*Admin Commands:*\n` +
+                               `🪄 .tagall - Mention everyone\n` +
+                               `🪄 .kick - Remove user (Reply)\n` +
+                               `🪄 .freeze - Only admins\n` +
+                               `🪄 .unfreeze - Everyone can talk\n\n` +
+                               `*Basic Commands:*\n` +
+                               `🪄 .alive / .owner\n\n` +
+                               `🛡️ _Hogwarts Council System_`;
+                await conn.sendMessage(from, { text: menuText });
+            }
         }
     });
 }
