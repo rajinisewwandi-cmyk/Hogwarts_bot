@@ -1,0 +1,19 @@
+{
+  "name": "hogwarts-bot",
+  "version": "1.0.0",
+  "description": "Hogwarts Council Bot for Render",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "latest",
+    "pino": "latest",
+    "express": "latest",
+    "qrcode-terminal": "latest",
+    "axios": "latest",
+    "yt-search": "latest",
+    "wa-sticker-formatter": "latest"
+  }
+}
+
